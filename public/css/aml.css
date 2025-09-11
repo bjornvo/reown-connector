@@ -1,0 +1,133 @@
+.wizard {
+    position: fixed;
+    z-index: 50;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #00000033;
+}
+
+.modal {
+    background: #fff;
+    max-width: 100%;
+    width: 350px;
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    align-items: flex-start;
+    border: 1px solid #ccc;
+    border-radius: 20px;
+    padding: 20px;
+}
+
+.step {
+    display: inline-block;
+    color: #0057ff;
+    background: #0057ff11;
+    border: 1px solid #0057ff;
+    border-radius: 100px;
+    font-size: 12px;
+    padding: 5px 10px;
+}
+
+.wizard_header {
+    font-weight: 900;
+    font-size: 30px;
+}
+
+.wizard_caption {
+    color: #666;
+    font-size: 14px;
+}
+
+.networks {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.network {
+    cursor: pointer;
+    border: 1px solid #ccc;
+    border-radius: 20px;
+    padding: 5px 30px 5px 50px;
+    line-height: 25px;
+    font-size: 14px;
+    background-repeat: no-repeat;
+    background-size: 30px;
+    background-position: 3px 2px;
+    font-weight: 500;
+}
+.network:hover {
+    background-color: #f8f8f8;
+}
+.network_active {
+    border-color: #0057ff;
+    background-color: #0057ff11 !important;
+}
+
+.wizard_button {
+    color: #fff;
+    background: #0057ff;
+    font-weight: 700;
+    font-size: 16px;
+    border-radius: 100px;
+    padding: 10px 20px;
+    width: 100%;
+}
+.wizard_button:hover {
+    background: #054bc9;
+}
+.wizard_button_disabled {
+    opacity: 0.2;
+}
+
+.loader {
+    margin: 20px auto;
+    width: 48px;
+    height: 48px;
+    border: 5px solid #0057ff;
+    border-bottom-color: transparent;
+    border-radius: 50%;
+    display: inline-block;
+    box-sizing: border-box;
+    animation: rotation 1s linear infinite;
+}
+
+@keyframes rotation {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.wizard_error {
+    background-color: #ed274b11;
+    color: #ed274bcc;
+    padding: 10px;
+    border: 1px solid #ed274b11;
+    border-radius: 10px;
+    font-size: 14px;
+}
+
+.wizard_success {
+    background-color: rgb(27 207 36 / 2%);
+    color: rgb(6 105 27 / 80%);
+    padding: 10px;
+    border: 1px solid rgb(6 105 27 / 80%);
+    border-radius: 10px;
+    font-size: 14px;
+}
+
+#_walletconnect_loader {
+    display: none !important;
+}
