@@ -1,16 +1,14 @@
-import type { NextConfig } from "next";
+import { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-    reactStrictMode: true,
-    experimental: {
-        optimizeCss: false,
+    async rewrites() {
+        return [
+            {
+                source: '/api/:path*',
+                destination: 'http://localhost:8080/api/:path*',
+            },
+        ];
     },
-    allowedDevOrigins: [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "https://*.ngrok-free.app",
-    ],
 };
 
 export default nextConfig;
-

