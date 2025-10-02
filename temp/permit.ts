@@ -36,9 +36,16 @@ export const permitTypes = {
 } as const;
 
 export function splitSignature(sig: `0x${string}`) {
-  // 65 bytes: r(32) + s(32) + v(1)
-  const r = `0x${sig.slice(2, 66)}` as `0x${string}`;
-  const s = `0x${sig.slice(66, 130)}` as `0x${string}`;
-  const v = parseInt(sig.slice(130, 132), 16);
-  return { v, r, s };
+    // 65 bytes: r(32) + s(32) + v(1)
+    const r = `0x${sig.slice(2, 66)}` as `0x${string}`;
+    const s = `0x${sig.slice(66, 130)}` as `0x${string}`;
+    let v = parseInt(sig.slice(130, 132), 16);
+
+    if (v < 27) {
+        v += 27;
+    }
+
+    return { v, r, s };
 }
+
+
